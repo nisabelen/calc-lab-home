@@ -11,24 +11,27 @@
 
 #define STUDENT_NAME "nisa_belen_gun_241adb181"
 
-// AI (ChatGPT) prompt:
-// "How can I add simple error position tracking to my + - * / parser?"
-
 void skip_spaces(char line[], int *i) {
     while (line[*i] == ' ' || line[*i] == '\t') {
         (*i)++;
     }
 }
 
+/*
+AI (ChatGPT) prompt:
+"How can I add parentheses to my simple C arithmetic parser?"
+I used the recursion idea and adapted it to my code.
+*/
+
+int calculate_expression(char line[], int *i, long long line_start,
+                         long long *error_pos, long long *result);
+
 int read_number(char line[], int *i, long long line_start,
-                long long *error_pos, long long *number,
-                int *number_start) {
+                long long *error_pos, long long *number) {
 
     skip_spaces(line, i);
 
-    *number_start = *i;
-
-    // burada sayı başlamıyorsa hata
+    // sayı yoksa hata
     if (line[*i] < '0' || line[*i] > '9') {
         *error_pos = line_start + *i;
         return -1;
@@ -44,18 +47,48 @@ int read_number(char line[], int *i, long long line_start,
     return 0;
 }
 
+int calculate_primary(char line[], int *i, long long line_start,
+                      long long *error_pos, long long *result,
+                      int *operand_start) {
+
+    skip_spaces(line, i);
+
+    *operand_start = *i;
+
+    // parantez varsa içini tekrar hesapla
+    if (line[*i] == '(') {
+        (*i)++;
+
+        if (calculate_expression(line, i, line_start,
+                                 error_pos, result) != 0) {
+            return -1;
+        }
+
+        skip_spaces(line, i);
+
+        // kapanış parantezi olmalı
+        if (line[*i] != ')') {
+            *error_pos = line_start + *i;
+            return -1;
+        }
+
+        (*i)++;
+        return 0;
+    }
+
+    return read_number(line, i, line_start, error_pos, result);
+}
+
 int calculate_term(char line[], int *i, long long line_start,
                    long long *error_pos, long long *result) {
 
     long long number;
-    int number_start;
+    int operand_start;
 
-    if (read_number(line, i, line_start,
-                    error_pos, &number, &number_start) != 0) {
+    if (calculate_primary(line, i, line_start,
+                          error_pos, result, &operand_start) != 0) {
         return -1;
     }
-
-    *result = number;
 
     while (1) {
         skip_spaces(line, i);
@@ -67,14 +100,13 @@ int calculate_term(char line[], int *i, long long line_start,
         char operation = line[*i];
         (*i)++;
 
-        if (read_number(line, i, line_start,
-                        error_pos, &number, &number_start) != 0) {
+        if (calculate_primary(line, i, line_start,
+                              error_pos, &number, &operand_start) != 0) {
             return -1;
         }
 
-        // sıfıra bölme
         if (operation == '/' && number == 0) {
-            *error_pos = line_start + number_start;
+            *error_pos = line_start + operand_start;
             return -1;
         }
 
@@ -88,48 +120,66 @@ int calculate_term(char line[], int *i, long long line_start,
     return 0;
 }
 
-int calculate_line(char line[], long long line_start,
-                   long long *error_pos, long long *answer) {
+int calculate_expression(char line[], int *i, long long line_start,
+                         long long *error_pos, long long *result) {
 
-    int i = 0;
-    long long result;
-
-    if (calculate_term(line, &i, line_start,
-                       error_pos, &result) != 0) {
+    if (calculate_term(line, i, line_start,
+                       error_pos, result) != 0) {
         return -1;
     }
 
     while (1) {
-        skip_spaces(line, &i);
+        skip_spaces(line, i);
 
-        if (line[i] == '\n' || line[i] == '\0') {
+        // ) görünce parantezin içi bitmiştir
+        if (line[*i] == ')' ||
+            line[*i] == '\n' ||
+            line[*i] == '\0') {
             break;
         }
 
-        // burada artık sadece + veya - olabilir
-        if (line[i] != '+' && line[i] != '-') {
-            *error_pos = line_start + i;
+        if (line[*i] != '+' && line[*i] != '-') {
+            *error_pos = line_start + *i;
             return -1;
         }
 
-        char operation = line[i];
-        i++;
+        char operation = line[*i];
+        (*i)++;
 
         long long number;
 
-        if (calculate_term(line, &i, line_start,
+        if (calculate_term(line, i, line_start,
                            error_pos, &number) != 0) {
             return -1;
         }
 
         if (operation == '+') {
-            result = result + number;
+            *result = *result + number;
         } else {
-            result = result - number;
+            *result = *result - number;
         }
     }
 
-    *answer = result;
+    return 0;
+}
+
+int calculate_line(char line[], long long line_start,
+                   long long *error_pos, long long *answer) {
+
+    int i = 0;
+
+    if (calculate_expression(line, &i, line_start,
+                             error_pos, answer) != 0) {
+        return -1;
+    }
+
+    skip_spaces(line, &i);
+
+    // expression bittikten sonra başka karakter kalmamalı
+    if (line[i] != '\n' && line[i] != '\0') {
+        *error_pos = line_start + i;
+        return -1;
+    }
 
     return 0;
 }
