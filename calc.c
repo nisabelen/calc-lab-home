@@ -1050,7 +1050,6 @@ int main(int argc,
             FIRST_NAME,
             STUDENT_ID
         );
-
         output_dir =
             default_output;
     }
@@ -1077,7 +1076,6 @@ int main(int argc,
 
         return 0;
     }
-
     if (process_directory(
             input_dir,
             output_dir) != 0) {
